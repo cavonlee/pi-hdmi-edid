@@ -1,0 +1,215 @@
+#!/bin/bash
+# hdmi-edid — unified HDMI EDID management for Raspberry Pi 5
+# Usage: hdmi-edid setup|switch|rollback|boot-check
+set -euo pipefail
+
+C="HDMI-A-1"
+E="/sys/class/drm/card1-${C}/edid"
+O="/sys/kernel/debug/dri/1/${C}/edid_override"
+S="/sys/class/drm/card1-${C}/status"
+F="/lib/firmware/edid-hdmi-audio.bin"
+CMDLINE="/boot/firmware/cmdline.txt"
+CONFIG_TXT="/boot/firmware/config.txt"
+
+usage() {
+    echo "Usage: hdmi-edid setup|switch|rollback"
+    echo ""
+    echo "  setup     Full deployment (generate EDID, configure system, install service)"
+    echo "  switch    Auto-detect and switch EDID mode (real or fake)"
+    echo "  rollback  Restore original configuration"
+    exit 1
+}
+
+need_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "ERROR: must run as root" >&2
+        exit 1
+    fi
+}
+
+# ─── generate_fake_edid ────────────────────────────────────────────
+generate_fake_edid() {
+    echo "Generating fake EDID..."
+    base64 -d > "$F" << 'B64EOF'
+AP///////wBI8gEAAQAAABojAQSlAAB4Du6Ro1RMmSYPUFQhCAABAQEBAQEBAQEBAQEBAQEBAjqA
+GHE4LUBYLEUAAAAAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/QA5
+Px5VqgAAAAAAAAAAAZICAxIAIwkHB4MAAAFlAwwAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAApw==
+B64EOF
+    echo "  Fake EDID written: $(wc -c < "$F") bytes"
+}
+
+# ─── configure_system ──────────────────────────────────────────────
+configure_system() {
+    echo "Configuring system..."
+
+    # cmdline.txt — add vc4.force_hotplug=1
+    if ! grep -q 'vc4.force_hotplug=1' "$CMDLINE"; then
+        [ ! -f "${CMDLINE}.bak" ] && cp "$CMDLINE" "${CMDLINE}.bak"
+        sed -i '$s/$/ vc4.force_hotplug=1/' "$CMDLINE"
+        echo "  Added vc4.force_hotplug=1 to cmdline.txt"
+    else
+        echo "  vc4.force_hotplug=1 already in cmdline.txt"
+    fi
+
+    # config.txt — add hdmi_force_hotplug=1 after vc4-kms-v3d
+    if ! grep -q '^hdmi_force_hotplug=1' "$CONFIG_TXT"; then
+        sed -i '/^dtoverlay=vc4-kms-v3d$/a hdmi_force_hotplug=1' "$CONFIG_TXT"
+        echo "  Added hdmi_force_hotplug=1 to config.txt"
+    else
+        echo "  hdmi_force_hotplug=1 already in config.txt"
+    fi
+}
+
+# ─── install_service ───────────────────────────────────────────────
+install_service() {
+    echo "Installing systemd service..."
+    cat > /etc/systemd/system/hdmi-edid-boot.service << 'UNITEOF'
+[Unit]
+Description=HDMI EDID Boot Check
+After=multi-user.target
+Wants=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/hdmi-edid boot-check
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+UNITEOF
+    systemctl daemon-reload
+    systemctl enable hdmi-edid-boot.service
+    echo "  Service installed and enabled"
+}
+
+# ─── boot_check ────────────────────────────────────────────────────
+boot_check() {
+    logger -t hdmi-edid "Boot check: reading EDID..."
+
+    # Wait for DRM (30s max)
+    for i in $(seq 1 30); do
+        [ -f "$E" ] && break
+        sleep 1
+    done
+
+    if [ ! -f "$E" ]; then
+        logger -t hdmi-edid "ERROR: EDID sysfs not found"
+        exit 1
+    fi
+
+    # Read EDID via temp file (bash $() strips null bytes)
+    TMP=$(mktemp)
+    cat "$E" > "$TMP" 2>/dev/null || true
+    SZ=$(wc -c < "$TMP")
+    rm -f "$TMP"
+
+    if [ "$SZ" -ge 256 ]; then
+        logger -t hdmi-edid "Real EDID found (${SZ}B). No override needed."
+        exit 0
+    fi
+
+    logger -t hdmi-edid "No EDID (${SZ}B). Applying fake EDID."
+    if [ -f "$F" ] && [ -w "$O" ]; then
+        cat "$F" > "$O"
+        echo detect > "$S" 2>/dev/null || true
+        logger -t hdmi-edid "Fake EDID applied."
+    fi
+}
+
+# ─── switch ────────────────────────────────────────────────────────
+do_switch() {
+    echo "=== HDMI EDID Switch ==="
+
+    # Clear override, read DDC
+    echo -n reset > "$O" 2>/dev/null || true
+    echo detect > "$S" 2>/dev/null || true
+    sleep 0.5
+
+    TMP=$(mktemp)
+    cat "$E" > "$TMP" 2>/dev/null || true
+    SZ=$(wc -c < "$TMP")
+    rm -f "$TMP"
+
+    if [ "$SZ" -ge 256 ]; then
+        echo "Real EDID detected (${SZ}B) — using hardware EDID"
+        echo "Modes:"
+        cat /sys/class/drm/card1-${C}/modes 2>/dev/null | grep '^[0-9]' | sort -t x -k1 -nr | uniq | head -10
+    else
+        echo "No real EDID (${SZ}B) — applying fake EDID"
+        cat "$F" > "$O" 2>/dev/null
+        echo detect > "$S" 2>/dev/null || true
+        sleep 0.3
+        echo "Modes: $(cat /sys/class/drm/card1-${C}/modes 2>/dev/null | head -3 | tr '\n' ' ')"
+        echo "Audio: $(aplay -D plughw:vc4hdmi0 /usr/share/sounds/alsa/Front_Center.wav 2>&1 | tail -1)"
+    fi
+}
+
+# ─── rollback ──────────────────────────────────────────────────────
+do_rollback() {
+    echo "=== HDMI EDID Rollback ==="
+
+    # Restore cmdline
+    if [ -f "${CMDLINE}.bak" ]; then
+        cp "${CMDLINE}.bak" "$CMDLINE"
+        echo "[1/4] cmdline restored from backup"
+    else
+        sed -i 's/ vc4.force_hotplug=1//' "$CMDLINE"
+        echo "[1/4] vc4.force_hotplug removed from cmdline"
+    fi
+
+    # Remove hdmi_force_hotplug from config.txt
+    sed -i '/^hdmi_force_hotplug=1/d' "$CONFIG_TXT" 2>/dev/null || true
+    echo "[2/4] hdmi_force_hotplug removed from config.txt"
+
+    # Disable and remove service
+    systemctl disable hdmi-edid-boot.service 2>/dev/null || true
+    systemctl stop hdmi-edid-boot.service 2>/dev/null || true
+    rm -f /etc/systemd/system/hdmi-edid-boot.service
+    systemctl daemon-reload
+    echo "[3/4] systemd service removed"
+
+    # Clear EDID override
+    echo -n reset > "$O" 2>/dev/null || true
+    echo detect > "$S" 2>/dev/null || true
+    echo "[4/4] EDID override cleared"
+
+    echo ""
+    echo "Rollback complete. Reboot to fully apply."
+}
+
+# ─── main ──────────────────────────────────────────────────────────
+case "${1:-}" in
+    setup)
+        need_root
+        generate_fake_edid
+        configure_system
+        install_service
+        # Install self to /usr/local/bin
+        cp "$0" /usr/local/bin/hdmi-edid 2>/dev/null || true
+        chmod +x /usr/local/bin/hdmi-edid 2>/dev/null || true
+        echo ""
+        echo "========================================"
+        echo "  Setup complete. Reboot to take effect."
+        echo "========================================"
+        echo ""
+        echo "After reboot: hdmi-edid switch"
+        ;;
+    switch)
+        need_root
+        do_switch
+        ;;
+    rollback)
+        need_root
+        do_rollback
+        ;;
+    boot-check)
+        boot_check
+        ;;
+    *)
+        usage
+        ;;
+esac
