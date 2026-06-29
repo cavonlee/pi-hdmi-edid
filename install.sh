@@ -54,7 +54,6 @@ cat > /etc/systemd/system/hdmi-edid-boot.service << 'UNITEOF'
 [Unit]
 Description=HDMI EDID Boot Setup
 After=multi-user.target
-Wants=multi-user.target
 
 [Service]
 Type=oneshot

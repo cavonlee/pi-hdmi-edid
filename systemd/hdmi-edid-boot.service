@@ -1,7 +1,6 @@
 [Unit]
 Description=HDMI EDID Boot Setup
 After=multi-user.target
-Wants=multi-user.target
 
 [Service]
 Type=oneshot
