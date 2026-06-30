@@ -25,7 +25,7 @@ B64EOF
 echo "  Fake EDID: $(wc -c < "$FAKE_EDID") bytes"
 
 # 2. Configure kernel
-echo "[2/6] Configuring cmdline.txt..."
+echo "[2/5] Configuring cmdline.txt..."
 if ! grep -q 'vc4.force_hotplug=1' "$CMDLINE"; then
     [ ! -f "${CMDLINE}.bak" ] && cp "$CMDLINE" "${CMDLINE}.bak"
     sed -i '$s/$/ vc4.force_hotplug=1/' "$CMDLINE"
@@ -34,15 +34,7 @@ else
     echo "  vc4.force_hotplug=1 already present"
 fi
 
-echo "[3/6] Loading EDID firmware at boot..."
-if ! grep -q 'drm.edid_firmware=HDMI-A-1' "$CMDLINE"; then
-    sed -i '$s/$/ drm.edid_firmware=HDMI-A-1:edid-hdmi-audio.bin/' "$CMDLINE"
-    echo "  Added drm.edid_firmware=HDMI-A-1:edid-hdmi-audio.bin"
-else
-    echo "  drm.edid_firmware already present"
-fi
-
-echo "[4/6] Configuring config.txt..."
+echo "[3/5] Configuring config.txt..."
 if ! grep -q '^hdmi_force_hotplug=1' "$CONFIG_TXT"; then
     sed -i '/^dtoverlay=vc4-kms-v3d$/a hdmi_force_hotplug=1' "$CONFIG_TXT"
     echo "  Added hdmi_force_hotplug=1"
@@ -51,13 +43,13 @@ else
 fi
 
 # 3. Download hdmi-edid script
-echo "[5/6] Installing hdmi-edid..."
+echo "[4/5] Installing hdmi-edid..."
 curl -sL -o "$SCRIPT" https://raw.githubusercontent.com/sunfounder/pi-hdmi-edid/main/hdmi-edid
 chmod +x "$SCRIPT"
 echo "  Installed to $SCRIPT"
 
 # 4. Install systemd service
-echo "[6/6] Installing systemd service..."
+echo "[5/5] Installing systemd service..."
 cat > /etc/systemd/system/hdmi-edid-boot.service << 'UNITEOF'
 [Unit]
 Description=HDMI EDID Boot Setup

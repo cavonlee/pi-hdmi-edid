@@ -85,10 +85,7 @@ do_uninstall() {
     echo "=== HDMI EDID Uninstall ==="
     echo ""
 
-    [ -f "${CMDLINE}.bak" ] && cp "${CMDLINE}.bak" "$CMDLINE" || {
-        sed -i 's/ vc4.force_hotplug=1//' "$CMDLINE"
-        sed -i 's/ drm.edid_firmware=HDMI-A-1:edid-hdmi-audio.bin//' "$CMDLINE"
-    }
+    [ -f "${CMDLINE}.bak" ] && cp "${CMDLINE}.bak" "$CMDLINE" || sed -i 's/ vc4.force_hotplug=1//' "$CMDLINE"
     echo "[1/3] cmdline restored"
 
     sed -i '/^hdmi_force_hotplug=1/d' "$CONFIG_TXT" 2>/dev/null || true
