@@ -19,7 +19,7 @@ GEN="/tmp/hdmi-edid-gen"
 curl -sL -o "$GEN" https://raw.githubusercontent.com/sunfounder/pi-hdmi-edid/main/hdmi-edid-gen
 chmod +x "$GEN"
 # Default active modes (same as hdmi-edid config defaults)
-DEFAULT_MODES="4k30,1080p60,1080p50,1080p30,1080p24,720p60,1440p60,800p60,768p60,900p60,1050p60,1200p60,x1024p60,480p60"
+DEFAULT_MODES="4k30,4k25,4k24,1080p60,1080p50,1080p30,1080p25,1080p24,1080i60,1080i50,720p60,720p50,1440p60,1600p60,uw1080p60,uw1440p60,uxga60,1200p60,1050p60,900p60_1600,900p60,768p60,sxga60,800p60,x1024p60,480p60,480p60_720"
 echo "  Generating default EDID..."
 python3 "$GEN" "1080p60" "$DEFAULT_MODES"
 rm -f "$GEN"
