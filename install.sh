@@ -81,7 +81,7 @@ def write_dtd(buf, off, t):
 def write_cea_header(buf, off, dtd_offset, n_dtds):
     buf[off] = 0x02  # CEA-861 tag
     buf[off+1] = 0x03  # revision
-    buf[off+2] = dtd_offset
+    buf[off+2] = dtd_offset & 0x7F  # must be <= 127
     buf[off+3] = n_dtds
 
 def write_audio_and_vendor(buf, off):
@@ -149,12 +149,14 @@ edid[127] = (256 - sum(edid[:127])) & 0xFF
 
 # === Block 1: CEA-861 with VIC list + audio + 5 DTDs ===
 pos1 = 4
-pos1 = write_vic_list(edid, EDID_BLOCK + pos1, VICS)
-pos1 = write_audio_and_vendor(edid, EDID_BLOCK + pos1)
-write_cea_header(edid, EDID_BLOCK, pos1, len(BLOCK1_DTDS))
+pos1_abs = write_vic_list(edid, EDID_BLOCK + pos1, VICS)
+pos1_abs = write_audio_and_vendor(edid, pos1_abs)
+dtd_off = pos1_abs - EDID_BLOCK
+write_cea_header(edid, EDID_BLOCK, dtd_off, len(BLOCK1_DTDS))
 for key in BLOCK1_DTDS:
-    write_dtd(edid, EDID_BLOCK + pos1, TIMINGS[key])
-    pos1 += 18
+    write_dtd(edid, pos1_abs, TIMINGS[key])
+    pos1_abs += 18
+pos1 = pos1_abs - EDID_BLOCK
 for i in range(pos1, 127):
     edid[EDID_BLOCK + i] = 0x00
 edid[EDID_BLOCK + 127] = (256 - sum(edid[EDID_BLOCK:EDID_BLOCK+127])) & 0xFF
