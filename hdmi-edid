@@ -45,6 +45,21 @@ do_switch() {
     echo "=== HDMI EDID Switch ==="
     echo ""
 
+    # Path B check: drm.edid_firmware overrides everything
+    if grep -q 'drm.edid_firmware' /proc/cmdline 2>/dev/null; then
+        echo "WARNING: Path B mode (drm.edid_firmware in cmdline)"
+        echo "  EDID is permanently overridden — switch has no effect."
+        echo "  To read external EDID: connect display, then read I2C DDC."
+        echo ""
+        # Still refresh audio services
+        for uid in $(loginctl list-users --no-legend 2>/dev/null | awk '{print $1}'); do
+            systemctl --user -M "${uid}@.host" restart pipewire pipewire-pulse wireplumber 2>/dev/null || true
+        done
+        killall wf-panel-pi 2>/dev/null || true
+        echo "Audio services refreshed."
+        return
+    fi
+
     # Clear override, read DDC
     echo -n reset > "$O" 2>/dev/null || true
     echo detect > "$S" 2>/dev/null || true
