@@ -352,9 +352,8 @@ _cfg_reset_cfm() {
 _cfg_mode_toggle() {
     echo ""
     if grep -q 'drm.edid_firmware' /proc/cmdline 2>/dev/null; then
-        # Currently force mode — check if auto is possible
-        echo "Current: force. Checking if auto mode is supported..."
-        # Read EDID from sysfs
+        echo "Current mode: force"
+        echo "Checking if auto mode is supported..."
         local has_audio=false
         local edid_path=$(ls /sys/class/drm/card*-HDMI-A-1/edid 2>/dev/null | head -1)
         if [ -n "$edid_path" ]; then
@@ -379,9 +378,14 @@ _cfg_mode_toggle() {
             rm -f "$tmp"
         fi
         if $has_audio; then
-            echo "Audio EDID detected — switching to auto mode..."
+            printf "Audio EDID detected. Switch to auto mode? [y/N]: "
+            read -r yn
+            if [ "${yn,,}" != "y" ]; then
+                echo "Cancelled."
+                read -p "Press Enter..."
+                return
+            fi
             sed -i 's/ drm.edid_firmware=HDMI-A-1:edid-hdmi-audio.bin//' /boot/firmware/cmdline.txt
-            # Install boot service
             cat > /etc/systemd/system/hdmi-edid-boot.service << 'UNITEOF'
 [Unit]
 Description=HDMI EDID Boot Setup
@@ -397,20 +401,26 @@ WantedBy=multi-user.target
 UNITEOF
             systemctl daemon-reload
             systemctl enable hdmi-edid-boot.service
-            echo "Switched to auto. Reboot to apply."
+            echo "Switched to auto mode."
         else
-            echo "No audio EDID detected — cannot switch to auto."
+            echo "No audio EDID detected — auto mode not supported."
         fi
     else
-        # Currently auto mode — switch to force
-        echo "Current: auto. Switching to force mode..."
+        echo "Current mode: auto"
+        printf "Switch to force mode? [y/N]: "
+        read -r yn
+        if [ "${yn,,}" != "y" ]; then
+            echo "Cancelled."
+            read -p "Press Enter..."
+            return
+        fi
         if ! grep -q 'drm.edid_firmware=HDMI-A-1:edid-hdmi-audio.bin' /boot/firmware/cmdline.txt; then
             sed -i '$s/$/ drm.edid_firmware=HDMI-A-1:edid-hdmi-audio.bin/' /boot/firmware/cmdline.txt
         fi
         systemctl disable hdmi-edid-boot.service 2>/dev/null || true
         rm -f /etc/systemd/system/hdmi-edid-boot.service
         systemctl daemon-reload
-        echo "Switched to force. Reboot to apply."
+        echo "Switched to force mode."
     fi
     read -p "Press Enter..."
 }
