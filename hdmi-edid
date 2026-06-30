@@ -94,227 +94,453 @@ do_switch() {
 # ─── config ────────────────────────────────────────────────────────
 do_config() {
     need_root
-    echo "=== HDMI EDID Resolution Config ==="
-    echo ""
-    echo "Select fake EDID preferred resolution:"
-    echo ""
-    echo "  ── 1080p ──            ── 4K ──"
-    echo "   1) 1920x1080 @24Hz     12) 3840x2160 @24Hz"
-    echo "   2) 1920x1080 @25Hz     13) 3840x2160 @25Hz"
-    echo "   3) 1920x1080 @30Hz     14) 3840x2160 @30Hz"
-    echo "   4) 1920x1080 @50Hz     15) 3840x2160 @50Hz"
-    echo "   5) 1920x1080 @60Hz *   16) 3840x2160 @60Hz"
-    echo ""
-    echo "  ── 1080i ──            ── PC / Other ──"
-    echo "   6) 1920x1080i@50Hz     17) 1280x720  @60Hz"
-    echo "   7) 1920x1080i@60Hz     18) 1280x720  @50Hz"
-    echo "                          19) 1280x800  @60Hz"
-    echo "  ── 2K ──               20) 1360x768  @60Hz"
-    echo "   8) 2560x1440 @60Hz     21) 1440x900  @60Hz"
-    echo "   9) 2560x1600 @60Hz     22) 1600x900  @60Hz"
-    echo "                          23) 1680x1050 @60Hz"
-    echo "  ── Ultrawide ──        24) 1920x1200 @60Hz"
-    echo "  10) 2560x1080 @60Hz     25) 640x480   @60Hz"
-    echo "  11) 3440x1440 @60Hz     26) 720x480   @60Hz"
-    echo ""
-    echo "  * = default"
-    echo ""
-    printf "Enter number [1-26]: "
-    read -r choice
-
-    case "$choice" in
-        1)  MODE="1080p24" ;;
-        2)  MODE="1080p25" ;;
-        3)  MODE="1080p30" ;;
-        4)  MODE="1080p50" ;;
-        5)  MODE="1080p60" ;;
-        6)  MODE="1080i50" ;;
-        7)  MODE="1080i60" ;;
-        8)  MODE="1440p60" ;;
-        9)  MODE="1600p60" ;;
-        10) MODE="2560x1080p60" ;;
-        11) MODE="3440x1440p60" ;;
-        12) MODE="4k24" ;;
-        13) MODE="4k25" ;;
-        14) MODE="4k30" ;;
-        15) MODE="4k50" ;;
-        16) MODE="4k60" ;;
-        17) MODE="720p60" ;;
-        18) MODE="720p50" ;;
-        19) MODE="800p60" ;;
-        20) MODE="768p60" ;;
-        21) MODE="900p60" ;;
-        22) MODE="900p60_1600" ;;
-        23) MODE="1050p60" ;;
-        24) MODE="1200p60" ;;
-        25) MODE="480p60" ;;
-        26) MODE="480p60_720" ;;
-        *) echo "Invalid choice"; exit 1 ;;
-    esac
-
-    echo ""
-    echo "Generating fake EDID with $MODE..."
-
-    python3 << PYEOF
-import struct, sys
-
-mode = "$MODE"
-
-# DTD parameters: (pclk_10kHz, H_active, H_blank, H_offset, H_width,
-#                   V_active, V_blank, V_offset, V_width, H_pol, V_pol)
-# H_pol: 1=positive, 0=negative; V_pol: 1=positive, 0=negative
-timings = {
-    # 1080p CEA-861
-    "1080p24":  ( 7425, 1920, 830, 638, 44, 1080, 45, 4, 5, 1, 1),
-    "1080p25":  ( 7425, 1920, 720, 528, 44, 1080, 45, 4, 5, 1, 1),
-    "1080p30":  ( 7425, 1920, 280, 88, 44, 1080, 45, 4, 5, 1, 1),
-    "1080p50":  (14850, 1920, 720, 528, 44, 1080, 45, 4, 5, 1, 1),
-    "1080p60":  (14850, 1920, 280, 88, 44, 1080, 45, 4, 5, 1, 1),
-    # 1080i (field height = V_active/2)
-    "1080i50":  ( 7425, 1920, 720, 528, 44, 540, 22, 2, 5, 1, 1),
-    "1080i60":  ( 7425, 1920, 280, 88, 44, 540, 22, 2, 5, 1, 1),
-    # 2K (CVT-RB)
-    "1440p60":  (24150, 2560, 160, 48, 32, 1440, 41, 3, 5, 0, 0),
-    "1600p60":  (26850, 2560, 160, 48, 32, 1600, 46, 3, 6, 0, 0),
-    # Ultrawide
-    "2560x1080p60":  (18560, 2560, 160, 48, 32, 1080, 42, 3, 5, 0, 0),
-    "3440x1440p60":  (31975, 3440, 160, 48, 32, 1440, 41, 3, 5, 0, 0),
-    # 4K CEA-861
-    "4k24":     (29700, 3840, 1660, 1276, 88, 2160, 90, 8, 10, 1, 1),
-    "4k25":     (29700, 3840, 1440, 1056, 88, 2160, 90, 8, 10, 1, 1),
-    "4k30":     (29700, 3840, 560, 176, 88, 2160, 90, 8, 10, 1, 1),
-    "4k50":     (59400, 3840, 1440, 1056, 88, 2160, 90, 8, 10, 1, 1),
-    "4k60":     (59400, 3840, 560, 176, 88, 2160, 90, 8, 10, 1, 1),
-    # 720p
-    "720p60":   ( 7425, 1280, 370, 110, 40, 720, 30, 5, 5, 1, 1),
-    "720p50":   ( 7425, 1280, 700, 440, 40, 720, 30, 5, 5, 1, 1),
-    # PC resolutions (CVT-RB)
-    "800p60":   ( 7100, 1280, 160, 48, 32, 800, 23, 3, 6, 0, 0),
-    "768p60":   ( 8550, 1360, 432, 64, 112, 768, 27, 3, 6, 1, 1),
-    "900p60":   (10650, 1440, 464, 80, 152, 900, 34, 3, 6, 0, 0),
-    "900p60_1600": (10800, 1600, 160, 48, 32, 900, 34, 3, 6, 0, 0),
-    "1050p60":  (14625, 1680, 560, 104, 176, 1050, 39, 3, 6, 0, 0),
-    "1200p60":  (15400, 1920, 160, 48, 32, 1200, 35, 3, 6, 0, 0),
-    # Low resolutions
-    "480p60":   ( 2518, 640, 160, 16, 96, 480, 45, 10, 2, 0, 0),
-    "480p60_720": ( 2700, 720, 138, 16, 62, 480, 45, 9, 6, 0, 0),
+    _config_init
+    _config_loop
 }
 
-pclk, ha, hb, hso, hsw, va, vb, vso, vsw, hp, vp = timings[mode]
+_config_init() {
+    # Initialize from current EDID or defaults
+    # For now, always start with factory defaults
+    _CONFIG_ACTIVE=(
+        "3840x2160@60|4k60"
+        "3840x2160@30|4k30"
+        "1920x1080@60|1080p60"
+        "1920x1080@50|1080p50"
+        "1920x1080@30|1080p30"
+        "1920x1080@24|1080p24"
+        "1280x720@60|720p60"
+        "2560x1440@60|1440p60"
+        "1280x800@60|800p60"
+        "1360x768@60|768p60"
+        "1440x900@60|900p60"
+        "1680x1050@60|1050p60"
+        "1920x1200@60|1200p60"
+        "1024x768@60|x1024p60"
+        "640x480@60|480p60"
+    )
+    _CONFIG_PREF_IDX=2
+    _CONFIG_PRESET=(
+    "3840x2160@50|4k50"
+    "3840x2160@25|4k25"
+    "3840x2160@24|4k24"
+    "1920x1080@25|1080p25"
+    "1920x1080i@60|1080i60"
+    "1920x1080i@50|1080i50"
+    "1280x720@50|720p50"
+    "2560x1600@60|1600p60"
+    "2560x1080@60|uw1080p60"
+    "3440x1440@60|uw1440p60"
+    "1600x1200@60|uxga60"
+    "1600x900@60|900p60_1600"
+    "1280x1024@60|sxga60"
+    "1280x1024@75|sxga75"
+    "720x480@60|480p60_720"
+    "720x576@50|576p50"
+    "1920x1080@25|1080p25"
+    "1400x1050@60|1050p60_1400"
+    "1152x864@60|864p60"
+    "800x600@60|600p60"
+    "720x400@70|400p70"
+)
 
-edid = bytearray(256)
-CEA = 128
+_CONFIG_PREF_IDX=2  # default: 1920x1080@60
 
-# ---- Block 0: Base EDID ----
-edid[0:8]   = bytes([0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00])
-edid[8:10]  = bytes([0x48,0xF2])  # Manufacturer ID
-edid[10:12] = struct.pack('<H', 1)
-edid[12:16] = struct.pack('<I', 1)
-edid[16]    = 26   # week
-edid[17]    = 35   # year-1990
-edid[18]    = 0x01
-edid[19]    = 0x04
-edid[20]    = 0xA5
-edid[21:23] = bytes([0x00,0x00])
-edid[23]    = 0x78
-edid[24]    = 0x0E
-edid[25:35] = bytes([0xEE,0x91,0xA3,0x54,0x4C,0x99,0x26,0x0F,0x50,0x54])
-edid[35:38] = bytes([0x21,0x08,0x00])
+_config_loop() {
+    while true; do
+        _config_show
+        printf "Command [D/A/C/M/P/R/Q]: "
+        read -r cmd rest
+        case "${cmd^^}" in
+            D) _config_delete "$rest" ;;
+            A) _config_add ;;
+            C) _config_custom ;;
+            M) _config_merge ;;
+            P) _config_preferred "$rest" ;;
+            R) _config_reset ;;
+            Q) _config_save; break ;;
+            *) echo "Unknown command. D/A/C/M/P/R/Q" ;;
+        esac
+        echo ""
+    done
+}
 
-# Fill standard timings with unused
-for i in range(38, 54, 2):
-    edid[i] = 0x01; edid[i+1] = 0x01
+_config_show() {
+    clear 2>/dev/null || true
+    echo "=== HDMI EDID Config ==="
+    if grep -q 'drm.edid_firmware' /proc/cmdline 2>/dev/null; then
+        MODE="Path B (drm.edid_firmware)"
+    else
+        MODE="Path A (runtime switch)"
+    fi
+    PREF_LABEL="${_CONFIG_ACTIVE[$_CONFIG_PREF_IDX]%%|*}"
+    echo "Mode: $MODE  |  ${#_CONFIG_ACTIVE[@]} resolutions  |  Preferred: $PREF_LABEL"
+    echo ""
 
-# DTD 1: Preferred timing
-pclk_raw = pclk
-edid[54:56] = struct.pack('<H', pclk_raw)
-edid[56] = ha & 0xFF
-edid[57] = hb & 0xFF
-edid[58] = ((ha>>8)&0xF)<<4 | ((hb>>8)&0xF)
-edid[59] = va & 0xFF
-edid[60] = vb & 0xFF
-edid[61] = ((va>>8)&0xF)<<4 | ((vb>>8)&0xF)
-edid[62] = hso & 0xFF
-edid[63] = hsw & 0xFF
-edid[64] = ((vso&0xF)<<4) | (vsw&0xF)
-edid[65] = ((hso>>8)&0x3)<<2 | ((hsw>>8)&0x3)
-edid[66:72] = bytes([0x00,0x00,0x00,0x18,0x00,0x00])
-
-# DTD 2: unused, fill with zeros
-for i in range(72, 90):
-    edid[i] = 0x00
-
-# Display name
-edid[90:108] = bytes([0x00,0x00,0x00,0xFC,0x00,
-    0x48,0x44,0x4D,0x49,0x2D,0x45,0x44,0x49,0x44,0x0A,0x20,0x20,0x20])
-
-# Range limits
-edid[108:126] = bytes([0x00,0x00,0x00,0xFD,0x00,
-    57,63,30,85,0xAA,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00])
-
-edid[126] = 0x01  # 1 extension block
-edid[127] = (256 - sum(edid[:127])) & 0xFF
-
-# ---- Block 1: CEA-861 Extension ----
-edid[CEA+0] = 0x02   # CEA-861 tag
-edid[CEA+1] = 0x03   # revision
-
-pos = 4  # data block collection start
-
-# Audio: LPCM 2ch, 32/44.1/48kHz, 16/20/24bit
-edid[CEA+pos]   = (1<<5)|3    # Audio Data Block, 3 bytes payload
-edid[CEA+pos+1] = 0x09        # PCM, 2ch
-edid[CEA+pos+2] = 0x07        # 32/44.1/48 kHz
-edid[CEA+pos+3] = 0x07        # 16/20/24 bit
-pos += 4
-
-# Speaker: FL/FR
-edid[CEA+pos]   = (4<<5)|3
-edid[CEA+pos+1] = 0x00
-edid[CEA+pos+2] = 0x00
-edid[CEA+pos+3] = 0x01
-pos += 4
-
-# Vendor: HDMI (IEEE OUI 0x000C03)
-edid[CEA+pos]   = (3<<5)|5
-edid[CEA+pos+1] = 0x03
-edid[CEA+pos+2] = 0x0C
-edid[CEA+pos+3] = 0x00
-edid[CEA+pos+4] = 0x10   # PA=1.0.0.0, supports_ai=1
-edid[CEA+pos+5] = 0x00
-pos += 6
-
-edid[CEA+2] = pos     # DTD offset
-edid[CEA+3] = 0x00    # 0 native DTDs in extension
-
-for i in range(pos, 127):
-    edid[CEA+i] = 0x00
-edid[CEA+127] = (256 - sum(edid[CEA:CEA+127])) & 0xFF
-
-with open("$F", 'wb') as f:
-    f.write(bytes(edid))
-
-cs0 = (256 - sum(edid[:127])) & 0xFF
-cs1 = (256 - sum(edid[128:255])) & 0xFF
-print(f"  Block0 checksum: 0x{cs0:02x} {'OK' if cs0==edid[127] else 'FAIL'}")
-print(f"  Block1 checksum: 0x{cs1:02x} {'OK' if cs1==edid[255] else 'FAIL'}")
-print(f"  File size: {len(edid)} bytes")
-PYEOF
+    for i in "${!_CONFIG_ACTIVE[@]}"; do
+        LABEL="${_CONFIG_ACTIVE[$i]%%|*}"
+        MARK=" "
+        if [ "$i" -eq "$_CONFIG_PREF_IDX" ]; then MARK="*"; fi
+        printf "  [%2d] %-24s %s\n" $((i+1)) "$LABEL" "$MARK"
+    done
 
     echo ""
-    echo "Fake EDID updated: $MODE"
+    echo "D <num,num-num>  Delete   A  Add from preset   C  Custom WxH@Hz"
+    echo "M  Merge external EDID     P <num>  Set preferred"
+    echo "R  Restore defaults        Q  Save & quit"
+}
 
-    # Check if we're on Path B (drm.edid_firmware in cmdline)
+_config_delete() {
+    local nums="$1"
+    [ -z "$nums" ] && { echo "Usage: D <numbers>  e.g. D 1,3,5-7"; return; }
+    # Parse ranges like 1,3,5-7
+    local to_delete=()
+    IFS=',' read -ra parts <<< "$nums"
+    for part in "${parts[@]}"; do
+        if [[ "$part" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+            for ((n=${BASH_REMATCH[1]}; n<=${BASH_REMATCH[2]}; n++)); do
+                [ "$n" -ge 1 ] && [ "$n" -le "${#_CONFIG_ACTIVE[@]}" ] && to_delete+=($n)
+            done
+        else
+            [ "$part" -ge 1 ] && [ "$part" -le "${#_CONFIG_ACTIVE[@]}" ] && to_delete+=($part)
+        fi
+    done
+    [ ${#to_delete[@]} -eq 0 ] && { echo "No valid entries to delete."; return; }
+    [ ${#_CONFIG_ACTIVE[@]} -le 1 ] && { echo "Cannot delete last resolution."; return; }
+
+    # Sort descending to remove from end
+    IFS=$'\n' sorted=($(sort -rn <<< "${to_delete[*]}"))
+    unset IFS
+    for n in "${sorted[@]}"; do
+        local idx=$((n-1))
+        local label="${_CONFIG_ACTIVE[$idx]%%|*}"
+        unset '_CONFIG_ACTIVE[idx]'
+        # Adjust preferred index
+        if [ "$idx" -lt "$_CONFIG_PREF_IDX" ]; then _CONFIG_PREF_IDX=$((_CONFIG_PREF_IDX-1)); fi
+        if [ "$idx" -eq "$_CONFIG_PREF_IDX" ]; then _CONFIG_PREF_IDX=0; fi
+        echo "  Removed: $label"
+    done
+    _CONFIG_ACTIVE=("${_CONFIG_ACTIVE[@]}")
+}
+
+_config_add() {
+    echo ""
+    echo "Preset library:"
+    for i in "${!_CONFIG_PRESET[@]}"; do
+        local label="${_CONFIG_PRESET[$i]%%|*}"
+        printf "  [%2d] %s\n" $((i+1)) "$label"
+    done
+    echo ""
+    printf "Add which? (numbers, comma/range): "
+    read -r nums
+    [ -z "$nums" ] && return
+    local to_add=()
+    IFS=',' read -ra parts <<< "$nums"
+    for part in "${parts[@]}"; do
+        if [[ "$part" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+            for ((n=${BASH_REMATCH[1]}; n<=${BASH_REMATCH[2]}; n++)); do
+                [ "$n" -ge 1 ] && [ "$n" -le "${#_CONFIG_PRESET[@]}" ] && to_add+=($n)
+            done
+        else
+            [ "$part" -ge 1 ] && [ "$part" -le "${#_CONFIG_PRESET[@]}" ] && to_add+=($part)
+        fi
+    done
+    for n in "${to_add[@]}"; do
+        local entry="${_CONFIG_PRESET[$((n-1))]}"
+        local label="${entry%%|*}"
+        # Check if already in active
+        local found=false
+        for a in "${_CONFIG_ACTIVE[@]}"; do
+            [ "$a" = "$entry" ] && found=true && break
+        done
+        if ! $found; then
+            _CONFIG_ACTIVE+=("$entry")
+            echo "  Added: $label"
+        fi
+    done
+}
+
+_config_custom() {
+    echo ""
+    printf "Width: "; read -r w
+    printf "Height: "; read -r h
+    printf "Refresh (Hz): "; read -r hz
+    [ -z "$w" ] || [ -z "$h" ] || [ -z "$hz" ] && return
+    local key="custom_${w}x${h}x${hz}"
+    local label="${w}x${h}@${hz}"
+    _CONFIG_ACTIVE+=("$label|$key")
+    # Also add to presets for reuse
+    _CONFIG_PRESET+=("$label|$key")
+    echo "  Added: $label"
+}
+
+_config_merge() {
+    echo ""
+    echo "Reading external EDID via I2C..."
+    DDC=""
+    for bus in 13 11 14; do
+        if i2cdetect -y $bus 0x50 0x50 2>/dev/null | grep -q 50; then
+            DDC=$bus; break
+        fi
+    done
+    if [ -z "$DDC" ]; then
+        echo "ERROR: No DDC bus found."
+        return
+    fi
+
+    python3 << PYEOF
+import subprocess, struct
+data = bytearray(256)
+for a in range(256):
+    r = subprocess.run(['i2cget','-y','$DDC','0x50',str(a)], capture_output=True, text=True)
+    if r.returncode == 0: data[a] = int(r.stdout.strip(),16)
+if data[:8] != bytes([0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0]):
+    print("Invalid EDID header")
+    exit(1)
+
+# Get display name from EDID descriptor
+name = "Display"
+for dtd_off in [54, 72, 90, 108]:
+    if dtd_off+18 > 128: break
+    dtd = data[dtd_off:dtd_off+18]
+    if dtd[0:2] == bytes([0,0]) and dtd[3] == 0xFC:
+        name = dtd[5:18].decode('ascii','ignore').strip('\x00\x0a\x20')
+        break
+
+# Extract VICs
+vics = []
+if len(data) >= 256 and data[128] == 2:
+    off = data[130]; pos = 4
+    while pos < off:
+        tag = (data[128+pos]>>5)&7; length = data[128+pos]&31
+        if tag == 2:
+            n = data[128+pos+1]
+            for i in range(n): vics.append(data[128+pos+2+i])
+        pos += 1+length
+
+print(f"DISPLAY_NAME={name}")
+print(f"VICS={' '.join(str(v) for v in vics)}")
+print(f"EDID_BYTES={len(data)}")
+PYEOF
+
+    echo "External EDID read complete."
+    echo "Use 'Add from preset' to add resolutions from the external display."
+    _config_done_msg
+}
+
+_config_preferred() {
+    local n="$1"
+    [ -z "$n" ] && { echo "Usage: P <number>"; return; }
+    [ "$n" -ge 1 ] && [ "$n" -le "${#_CONFIG_ACTIVE[@]}" ] || { echo "Invalid number."; return; }
+    _CONFIG_PREF_IDX=$((n-1))
+    local label="${_CONFIG_ACTIVE[$_CONFIG_PREF_IDX]%%|*}"
+    echo "Preferred: $label"
+}
+
+_config_reset() {
+    _CONFIG_ACTIVE=(
+        "3840x2160@60|4k60"
+        "3840x2160@30|4k30"
+        "1920x1080@60|1080p60"
+        "1920x1080@50|1080p50"
+        "1920x1080@30|1080p30"
+        "1920x1080@24|1080p24"
+        "1280x720@60|720p60"
+        "2560x1440@60|1440p60"
+        "1280x800@60|800p60"
+        "1360x768@60|768p60"
+        "1440x900@60|900p60"
+        "1680x1050@60|1050p60"
+        "1920x1200@60|1200p60"
+        "1024x768@60|x1024p60"
+        "640x480@60|480p60"
+    )
+    _CONFIG_PREF_IDX=2
+    _CONFIG_PRESET=(
+        "3840x2160@50|4k50"
+        "3840x2160@25|4k25"
+        "3840x2160@24|4k24"
+        "1920x1080@25|1080p25"
+        "1920x1080i@60|1080i60"
+        "1920x1080i@50|1080i50"
+        "1280x720@50|720p50"
+        "2560x1600@60|1600p60"
+        "2560x1080@60|uw1080p60"
+        "3440x1440@60|uw1440p60"
+        "1600x1200@60|uxga60"
+        "1600x900@60|900p60_1600"
+        "1280x1024@60|sxga60"
+        "1280x1024@75|sxga75"
+        "720x480@60|480p60_720"
+    )
+    echo "Restored to factory defaults."
+}
+
+_config_save() {
+    echo "Saving..."
+    local pref_key="${_CONFIG_ACTIVE[$_CONFIG_PREF_IDX]##*|}"
+    _config_gen_edid "$pref_key"
+    echo "EDID written."
+    _config_done_msg
+}
+
+_config_done_msg() {
+    echo ""
     if grep -q 'drm.edid_firmware' /proc/cmdline 2>/dev/null; then
-        echo "  Path B detected: reboot required for new resolution."
-        echo "  Run: sudo systemctl reboot"
+        echo "Path B: Reboot required."
     else
-        echo "  Path A detected: run 'hdmi-edid switch' to apply."
-        echo "  Or reboot for boot-time application."
+        echo "Path A: Run hdmi-edid switch or reboot."
     fi
 }
 
-# ─── uninstall ─────────────────────────────────────────────────────
+# ─── EDID generation with active list ───
+_config_gen_edid() {
+    local pref_key="${1:-1080p60}"
+    # Build comma-separated key list for Python
+    local keys=""
+    for entry in "${_CONFIG_ACTIVE[@]}"; do
+        local k="${entry##*|}"
+        [ -z "$keys" ] && keys="$k" || keys="$keys,$k"
+    done
+
+    python3 << PYEOF
+import struct
+PREF_KEY = '$pref_key'
+ACTIVE_KEYS = '$keys'.split(',')
+
+TIMINGS = {
+    '1080p60':(14850,1920,280,88,44,1080,45,4,5,1,1),
+    '1080p50':(14850,1920,720,528,44,1080,45,4,5,1,1),
+    '1080p30':(7425,1920,280,88,44,1080,45,4,5,1,1),
+    '1080p25':(7425,1920,720,528,44,1080,45,4,5,1,1),
+    '1080p24':(7425,1920,830,638,44,1080,45,4,5,1,1),
+    '1080i60':(7425,1920,280,88,44,540,22,2,5,1,1),
+    '1080i50':(7425,1920,720,528,44,540,22,2,5,1,1),
+    '720p60':(7425,1280,370,110,40,720,30,5,5,1,1),
+    '720p50':(7425,1280,700,440,40,720,30,5,5,1,1),
+    '4k60':(59400,3840,560,176,88,2160,90,8,10,1,1),
+    '4k50':(59400,3840,1440,1056,88,2160,90,8,10,1,1),
+    '4k30':(29700,3840,560,176,88,2160,90,8,10,1,1),
+    '4k25':(29700,3840,1440,1056,88,2160,90,8,10,1,1),
+    '4k24':(29700,3840,1660,1276,88,2160,90,8,10,1,1),
+    '1440p60':(24150,2560,160,48,32,1440,41,3,5,0,0),
+    '1600p60':(26850,2560,160,48,32,1600,46,3,6,0,0),
+    'uw1080p60':(18560,2560,160,48,32,1080,42,3,5,0,0),
+    'uw1440p60':(31975,3440,160,48,32,1440,41,3,5,0,0),
+    '800p60':(7100,1280,160,48,32,800,23,3,6,0,0),
+    '768p60':(8550,1360,432,64,112,768,27,3,6,1,1),
+    '900p60':(10650,1440,464,80,152,900,34,3,6,0,0),
+    '900p60_1600':(10800,1600,160,48,32,900,34,3,6,0,0),
+    '1050p60':(14625,1680,560,104,176,1050,39,3,6,0,0),
+    '1200p60':(15400,1920,160,48,32,1200,35,3,6,0,0),
+    'x1024p60':(6500,1024,320,24,136,768,38,3,6,0,0),
+    'sxga60':(10800,1280,408,48,112,1024,42,3,6,1,1),
+    'sxga75':(13500,1280,408,48,112,1024,42,3,6,1,1),
+    'uxga60':(16200,1600,560,64,192,1200,50,3,6,1,1),
+    '480p60':(2518,640,160,16,96,480,45,10,2,0,0),
+    '480p60_720':(2700,720,138,16,62,480,45,9,6,0,0),
+}
+
+# Standard VIC codes for CEA resolutions
+VIC_MAP = {
+    '4k60':97, '4k50':96, '4k30':95, '4k25':94, '4k24':93,
+    '1080p60':16, '1080p50':31, '1080p30':34, '1080p25':33, '1080p24':32,
+    '1080i60':5, '1080i50':20,
+    '720p60':4, '720p50':19,
+    '480p60':1, '480p60_720':3,
+}
+
+def wd(buf, off, t):
+    pclk,ha,hb,hso,hsw,va,vb,vso,vsw,hp,vp = t
+    struct.pack_into('<H',buf,off,pclk)
+    buf[off+2]=ha&0xFF; buf[off+3]=hb&0xFF
+    buf[off+4]=((ha>>8)&0xF)<<4|((hb>>8)&0xF)
+    buf[off+5]=va&0xFF; buf[off+6]=vb&0xFF
+    buf[off+7]=((va>>8)&0xF)<<4|((vb>>8)&0xF)
+    buf[off+8]=hso&0xFF; buf[off+9]=hsw&0xFF
+    buf[off+10]=((vso&0xF)<<4)|(vsw&0xF)
+    buf[off+11]=((hso>>8)&0x3)<<2|((hsw>>8)&0x3)
+    buf[off+12:off+18]=bytes([0,0,0,0x18,0,0])
+
+# Separate VICs and DTDs
+vics = []
+dtds = []
+for k in ACTIVE_KEYS:
+    if k in VIC_MAP:
+        vics.append(VIC_MAP[k])
+    elif k in TIMINGS:
+        dtds.append(k)
+
+# Determine EDID size
+nd = len(dtds) + 1  # +1 for 720p60 fallback DTD
+nblocks = 1  # base
+if nd > 2:
+    nd -= 2  # block0 has 2 DTDs
+    nblocks += (nd + 4) // 5  # 5 DTDs per CEA block
+
+total_blocks = 1 + min(nblocks, 3)
+edid_size = total_blocks * 128
+B = 128
+
+e = bytearray(edid_size)
+e[0:8]=bytes([0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0])
+e[8:10]=bytes([0x48,0xF2]); e[10:12]=struct.pack('<H',1)
+e[12:16]=struct.pack('<I',1); e[16]=26; e[17]=35
+e[18]=1; e[19]=4; e[20]=0xA5; e[21:23]=bytes([0,0])
+e[23]=0x78; e[24]=0x0E
+e[25:35]=bytes([0xEE,0x91,0xA3,0x54,0x4C,0x99,0x26,0x0F,0x50,0x54])
+e[35:38]=bytes([0x21,0x08,0])
+for i in range(38,54,2): e[i]=1; e[i+1]=1
+
+# DTD1: preferred
+pref_t = TIMINGS.get(PREF_KEY)
+if not pref_t and dtds: pref_t = TIMINGS[dtds[0]]
+if not pref_t: pref_t = TIMINGS['1080p60']
+wd(e, 54, pref_t)
+
+# DTD2: 720p60 fallback (or second DTD)
+dtdo = [k for k in dtds if k != PREF_KEY]
+dtdo.insert(0, '720p60')
+dtd2 = dtdo[0] if dtdo[0] in TIMINGS else '720p60'
+wd(e, 72, TIMINGS[dtd2])
+dtds_remaining = [k for k in dtds if k not in (PREF_KEY, dtd2)]
+
+# Display name + range
+e[90:108]=bytes([0,0,0,0xFC,0,0x48,0x44,0x4D,0x49,0x2D,0x45,0x44,0x49,0x44,0x0A,0x20,0x20,0x20])
+e[108:126]=bytes([0,0,0,0xFD,0,24,77,30,85,0xAA,0,0,0,0,0,0,0,0])
+e[126]=total_blocks-1
+e[127]=(256-sum(e[:127]))&0xFF
+
+# CEA extension blocks
+for blk in range(1, total_blocks):
+    off = blk * B
+    e[off]=2; e[off+1]=3
+    p = 4
+    if blk == 1 and vics:
+        # VIC list
+        nv = len(vics)
+        e[off+p]=(2<<5)|((1+nv)&0x1F); e[off+p+1]=nv
+        for i,v in enumerate(vics): e[off+p+2+i]=v
+        p += 2+nv
+        # Audio blocks
+        e[off+p]=(1<<5)|3; e[off+p+1]=9; e[off+p+2]=7; e[off+p+3]=7; p+=4
+        e[off+p]=(4<<5)|3; e[off+p+1]=0; e[off+p+2]=0; e[off+p+3]=1; p+=4
+        e[off+p]=(3<<5)|5; e[off+p+1]=3; e[off+p+2]=0xC; e[off+p+3]=0
+        e[off+p+4]=0x10; e[off+p+5]=0; p+=6
+    # DTDs
+    n_dtd = 0
+    while dtds_remaining and p + 18 <= 127:
+        k = dtds_remaining.pop(0)
+        if k in TIMINGS:
+            wd(e, off+p, TIMINGS[k])
+            p += 18; n_dtd += 1
+    e[off+2]=p; e[off+3]=n_dtd
+    for i in range(p, 127): e[off+i]=0
+    e[off+127]=(256-sum(e[off:off+127]))&0xFF
+
+with open('/lib/firmware/edid-hdmi-audio.bin','wb') as f: f.write(bytes(e))
+print(f"  EDID: {len(e)}B, {len(vics)} VICs + {len(dtds)+2} DTDs, preferred: {PREF_KEY}")
+PYEOF
+}
 do_uninstall() {
     detect_paths
     echo "=== HDMI EDID Uninstall ==="
