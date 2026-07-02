@@ -5,21 +5,25 @@ set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "ERROR: must run as root"; exit 1; }
 
-# Auto-detect boot directory (works across Ubuntu / Raspbian / Armbian)
-BOOT_DIR=""
-for d in /boot/firmware /boot; do
-    if [ -f "$d/cmdline.txt" ]; then
-        BOOT_DIR="$d"
-        break
+# Auto-detect paths (Ubuntu flash-kernel puts cmdline in current/, Raspbian at top level)
+if [ -f "/boot/firmware/config.txt" ]; then
+    CONFIG_TXT="/boot/firmware/config.txt"
+    # Ubuntu flash-kernel: cmdline.txt is in current/ subdirectory
+    if [ -f "/boot/firmware/current/cmdline.txt" ]; then
+        CMDLINE="/boot/firmware/current/cmdline.txt"
+    elif [ -f "/boot/firmware/cmdline.txt" ]; then
+        CMDLINE="/boot/firmware/cmdline.txt"
+    else
+        echo "ERROR: cannot find cmdline.txt"
+        exit 1
     fi
-done
-if [ -z "$BOOT_DIR" ]; then
-    echo "ERROR: cannot find cmdline.txt in /boot/firmware or /boot"
-    echo "Please check your boot partition is mounted."
+elif [ -f "/boot/config.txt" ]; then
+    CONFIG_TXT="/boot/config.txt"
+    CMDLINE="/boot/cmdline.txt"
+else
+    echo "ERROR: cannot find config.txt in /boot/firmware or /boot"
     exit 1
 fi
-CMDLINE="$BOOT_DIR/cmdline.txt"
-CONFIG_TXT="$BOOT_DIR/config.txt"
 SCRIPT="/usr/local/bin/hdmi-edid"
 
 echo "=== pi-hdmi-edid installer ==="
@@ -74,7 +78,7 @@ echo "  hdmi-edid-merge installed"
 echo "[5/6] Installing initramfs hook..."
 curl -sL -o /etc/initramfs-tools/hooks/edid https://raw.githubusercontent.com/sunfounder/pi-hdmi-edid/main/initramfs-edid-hook
 chmod +x /etc/initramfs-tools/hooks/edid
-[ ! -f "$CMDLINE.bak" ] && cp "$CMDLINE" "$CMDLINE.bak" 2>/dev/null || true
+[ ! -f "${CMDLINE}.bak" ] && cp "$CMDLINE" "${CMDLINE}.bak" 2>/dev/null || true
 update-initramfs -u 2>&1 || echo "  WARNING: update-initramfs failed — EDID may not load at early boot"
 echo ""
 
