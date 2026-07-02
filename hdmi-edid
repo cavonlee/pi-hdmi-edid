@@ -110,7 +110,6 @@ _cfg_init() {
         "640x480@60|480p60"
         "720x480@60|480p60_720"
     )
-    _CONFIG_PREF_IDX=3
     _CONFIG_PRESET=(
         "1280x1024@75|sxga75"
         "1400x1050@60|1050p60_1400"
@@ -127,24 +126,22 @@ _cfg_loop() {
         echo "  2) Add from preset library"
         echo "  3) Custom WxH@Hz"
         echo "  4) Read external EDID (I2C)"
-        echo "  5) Set preferred"
-        echo "  6) Switch auto/force mode"
-        echo "  7) Restore defaults"
-        echo "  8) Save & quit"
-        echo "  9) Quit (discard changes)"
+        echo "  5) Switch auto/force mode"
+        echo "  6) Restore defaults"
+        echo "  7) Save & quit"
+        echo "  8) Quit (discard changes)"
         echo ""
-        printf "Enter choice [1-9]: "
+        printf "Enter choice [1-8]: "
         read -r choice
         case "$choice" in
             1) _cfg_delete ;;
             2) _cfg_add ;;
             3) _cfg_custom ;;
             4) _cfg_read ;;
-            5) _cfg_pref ;;
-            6) _cfg_mode_toggle ;;
-            7) _cfg_reset_cfm ;;
-            8) _cfg_save; break ;;
-            9) _cfg_quit ;;
+            5) _cfg_mode_toggle ;;
+            6) _cfg_reset_cfm ;;
+            7) _cfg_save; break ;;
+            8) _cfg_quit ;;
             *) echo "Invalid choice."; read -p "Press Enter..." ;;
         esac
     done
@@ -328,17 +325,6 @@ _cfg_read() {
     read -p "Press Enter..."
 }
 
-_cfg_pref() {
-    echo ""
-    printf "Set preferred — enter number [1-${#_CONFIG_ACTIVE[@]}]: "
-    read -r n
-    [ -z "$n" ] && return
-    [ "$n" -ge 1 ] && [ "$n" -le "${#_CONFIG_ACTIVE[@]}" ] || { echo "Invalid number."; read -p "Press Enter..."; return; }
-    _CONFIG_PREF_IDX=$((n-1))
-    echo "Preferred: ${_CONFIG_ACTIVE[$_CONFIG_PREF_IDX]%%|*}"
-    read -p "Press Enter..."
-}
-
 _cfg_reset_cfm() {
     echo ""
     printf "Restore factory defaults? This will reset all changes. [y/N]: "
@@ -438,7 +424,7 @@ _cfg_quit() {
 }
 
 _cfg_save() {
-    local pref_key="${_CONFIG_ACTIVE[$_CONFIG_PREF_IDX]##*|}"
+    local pref_key="${_CONFIG_ACTIVE[0]##*|}"
     local keys=""
     local entry
     for entry in "${_CONFIG_ACTIVE[@]}"; do
