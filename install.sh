@@ -5,8 +5,14 @@ set -euo pipefail
 
 [ "$(id -u)" -eq 0 ] || { echo "ERROR: must run as root"; exit 1; }
 
-CMDLINE="/boot/firmware/cmdline.txt"
-CONFIG_TXT="/boot/firmware/config.txt"
+# Auto-detect boot directory (Ubuntu vs Raspbian)
+if [ -f "/boot/firmware/cmdline.txt" ]; then
+    BOOT_DIR="/boot/firmware"
+else
+    BOOT_DIR="/boot"
+fi
+CMDLINE="$BOOT_DIR/cmdline.txt"
+CONFIG_TXT="$BOOT_DIR/config.txt"
 SCRIPT="/usr/local/bin/hdmi-edid"
 
 echo "=== pi-hdmi-edid installer ==="
@@ -61,7 +67,7 @@ echo "  hdmi-edid-merge installed"
 echo "[5/6] Installing initramfs hook..."
 curl -sL -o /etc/initramfs-tools/hooks/edid https://raw.githubusercontent.com/sunfounder/pi-hdmi-edid/main/initramfs-edid-hook
 chmod +x /etc/initramfs-tools/hooks/edid
-[ ! -f /boot/firmware/cmdline.txt.bak ] && cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak 2>/dev/null || true
+[ ! -f "$CMDLINE.bak" ] && cp "$CMDLINE" "$CMDLINE.bak" 2>/dev/null || true
 update-initramfs -u 2>&1 || echo "  WARNING: update-initramfs failed — EDID may not load at early boot"
 echo ""
 
